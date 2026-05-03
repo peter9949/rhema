@@ -19,6 +19,28 @@ export interface VerseLayoutMetrics {
   verseRect: VerseLayoutRect | null
 }
 
+const SECONDARY_TEXT_SCALE = 0.72
+const SECONDARY_TEXT_ALPHA = 0.84
+const SECONDARY_TEXT_GAP_MULTIPLIER = 0.55
+
+function buildVerseText(verse: VerseRenderData, includeVerseNumbers: boolean): string {
+  let fullText = ""
+  for (const segment of verse.segments) {
+    if (includeVerseNumbers && segment.verseNumber !== undefined) {
+      fullText += `${segment.verseNumber} `
+    }
+    fullText += `${segment.text} `
+  }
+  return fullText.trim()
+}
+
+function buildSecondaryText(verse: VerseRenderData): string {
+  if (!verse.secondaryText) return ""
+  return verse.secondaryTranslation
+    ? `${verse.secondaryTranslation}: ${verse.secondaryText}`
+    : verse.secondaryText
+}
+
 export function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -389,6 +411,9 @@ function drawVerseText(
   const verseAlign = resolveHorizontalAlign(vt.horizontalAlign, theme.layout.textAlign, true)
   const verseDecoration = resolveTextDecoration(vt.textDecoration)
   const lineHeightPx = vt.fontSize * vt.lineHeight
+  const secondaryFontSize = vt.fontSize * SECONDARY_TEXT_SCALE
+  const secondaryLineHeightPx = secondaryFontSize * Math.max(1.1, vt.lineHeight * 0.95)
+  const secondaryGap = secondaryFontSize * SECONDARY_TEXT_GAP_MULTIPLIER
 
   ctx.save()
   ctx.font = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
@@ -401,14 +426,10 @@ function drawVerseText(
   }
 
   // Build full text with verse numbers inline
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) {
-      fullText += `${segment.verseNumber} `
-    }
-    fullText += segment.text + " "
-  }
-  fullText = applyTextTransform(fullText.trim(), resolveTextTransform(vt.textTransform))
+  const fullText = applyTextTransform(
+    buildVerseText(verse, vn.visible),
+    resolveTextTransform(vt.textTransform),
+  )
 
   const wrappedLines = wrapText(ctx, fullText, textRectWidth)
 
@@ -483,6 +504,30 @@ function drawVerseText(
     currentY += lineHeightPx
   }
 
+  if (verse.secondaryText) {
+    const secondaryText = applyTextTransform(
+      buildSecondaryText(verse),
+      resolveTextTransform(vt.textTransform),
+    )
+    ctx.save()
+    ctx.font = `${vt.fontWeight} ${secondaryFontSize}px "${vt.fontFamily}", serif`
+    ctx.globalAlpha *= SECONDARY_TEXT_ALPHA
+
+    if (vt.letterSpacing > 0) {
+      try { ctx.letterSpacing = `${vt.letterSpacing * SECONDARY_TEXT_SCALE}px` } catch { /* unsupported in some WebViews */ }
+    }
+
+    const wrappedSecondaryLines = wrapText(ctx, secondaryText, textRectWidth)
+    currentY += secondaryGap
+
+    for (const line of wrappedSecondaryLines) {
+      drawStyledLine(line, x, currentY)
+      currentY += secondaryLineHeightPx
+    }
+
+    ctx.restore()
+  }
+
   ctx.restore()
 
   return currentY - startY
@@ -547,17 +592,20 @@ function measureVerseHeight(
   const vn = theme.verseNumbers
   const verseAlign = resolveHorizontalAlign(vt.horizontalAlign, theme.layout.textAlign, true)
   const lineHeightPx = vt.fontSize * vt.lineHeight
+  const secondaryFontSize = vt.fontSize * SECONDARY_TEXT_SCALE
+  const secondaryLineHeightPx = secondaryFontSize * Math.max(1.1, vt.lineHeight * 0.95)
+  const secondaryGap = verse.secondaryText
+    ? secondaryFontSize * SECONDARY_TEXT_GAP_MULTIPLIER
+    : 0
   ctx.save()
   ctx.font = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
   if (vt.letterSpacing > 0) {
     try { ctx.letterSpacing = `${vt.letterSpacing}px` } catch { /* unsupported in some WebViews */ }
   }
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) fullText += `${segment.verseNumber} `
-    fullText += `${segment.text} `
-  }
-  const transformed = applyTextTransform(fullText.trim(), resolveTextTransform(vt.textTransform))
+  const transformed = applyTextTransform(
+    buildVerseText(verse, vn.visible),
+    resolveTextTransform(vt.textTransform),
+  )
   const lines = wrapText(ctx, transformed, textRectWidth)
   let maxLineWidth = 0
   for (const [index, line] of lines.entries()) {
@@ -565,9 +613,29 @@ function measureVerseHeight(
     const width = isJustifiedLine ? textRectWidth : ctx.measureText(line).width
     if (width > maxLineWidth) maxLineWidth = width
   }
+
+  let totalHeight = Math.max(lineHeightPx, lines.length * lineHeightPx)
+
+  if (verse.secondaryText) {
+    ctx.font = `${vt.fontWeight} ${secondaryFontSize}px "${vt.fontFamily}", serif`
+    if (vt.letterSpacing > 0) {
+      try { ctx.letterSpacing = `${vt.letterSpacing * SECONDARY_TEXT_SCALE}px` } catch { /* unsupported in some WebViews */ }
+    }
+    const secondaryLines = wrapText(
+      ctx,
+      applyTextTransform(buildSecondaryText(verse), resolveTextTransform(vt.textTransform)),
+      textRectWidth,
+    )
+    for (const line of secondaryLines) {
+      const width = ctx.measureText(line).width
+      if (width > maxLineWidth) maxLineWidth = width
+    }
+    totalHeight += secondaryGap + Math.max(secondaryLineHeightPx, secondaryLines.length * secondaryLineHeightPx)
+  }
+
   ctx.restore()
   return {
-    height: Math.max(lineHeightPx, lines.length * lineHeightPx),
+    height: totalHeight,
     maxLineWidth: Math.max(1, maxLineWidth),
   }
 }

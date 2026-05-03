@@ -452,7 +452,25 @@ interface TranslationInfo {
   language: string
 }
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  es: "Spanish",
+  fr: "French",
+  pl: "Polish",
+  pt: "Portuguese",
+}
+
+function languageLabel(language: string): string {
+  return LANGUAGE_LABELS[language] ?? language.toUpperCase()
+}
+
 function BibleSection() {
+  const {
+    secondaryTranslationId,
+    secondaryTranslationLanguage,
+    setSecondaryTranslationId,
+    setSecondaryTranslationLanguage,
+  } = useSettingsStore()
   const [translations, setTranslations] = useState<TranslationInfo[]>([])
   const [activeId, setActiveId] = useState<number>(1)
   const [loading, setLoading] = useState(true)
@@ -487,6 +505,47 @@ function BibleSection() {
       console.error("Failed to set translation:", e)
     }
   }
+
+  const secondaryLanguages = Array.from(
+    new Set(
+      translations
+        .filter((translation) => translation.id !== activeId)
+        .map((translation) => translation.language),
+    ),
+  ).sort()
+
+  const secondaryTranslations = translations.filter(
+    (translation) =>
+      translation.id !== activeId &&
+      translation.language === secondaryTranslationLanguage,
+  )
+
+  useEffect(() => {
+    if (loading) return
+
+    if (!secondaryTranslationLanguage) {
+      if (secondaryTranslationId !== null) {
+        setSecondaryTranslationId(null)
+      }
+      return
+    }
+
+    const matchingTranslation = secondaryTranslations.find(
+      (translation) => translation.id === secondaryTranslationId,
+    )
+
+    if (matchingTranslation) {
+      return
+    }
+
+    setSecondaryTranslationId(secondaryTranslations[0]?.id ?? null)
+  }, [
+    loading,
+    secondaryTranslationId,
+    secondaryTranslationLanguage,
+    secondaryTranslations,
+    setSecondaryTranslationId,
+  ])
 
   const englishTranslations = translations.filter((t) => t.language === "en")
   const otherTranslations = translations.filter((t) => t.language !== "en")
@@ -535,6 +594,76 @@ function BibleSection() {
         <p className="text-[0.625rem] text-muted-foreground">
           Detected verses will display in this translation.
           {translations.length > 0 && ` ${translations.length} translations available.`}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Secondary Display Language
+        </label>
+        <Select
+          value={secondaryTranslationLanguage ?? "__none__"}
+          onValueChange={(value) => {
+            if (value === "__none__") {
+              setSecondaryTranslationLanguage(null)
+              setSecondaryTranslationId(null)
+              return
+            }
+
+            setSecondaryTranslationLanguage(value)
+          }}
+          disabled={loading}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={loading ? "Loading..." : "Select language"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Disabled</SelectItem>
+            {secondaryLanguages.map((language) => (
+              <SelectItem key={language} value={language}>
+                {languageLabel(language)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[0.625rem] text-muted-foreground">
+          Shows a second verse block beneath the main verse in preview and live output.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Secondary Display Version
+        </label>
+        <Select
+          value={secondaryTranslationId != null ? String(secondaryTranslationId) : "__none__"}
+          onValueChange={(value) => {
+            setSecondaryTranslationId(value === "__none__" ? null : parseInt(value))
+          }}
+          disabled={loading || !secondaryTranslationLanguage || secondaryTranslations.length === 0}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue
+              placeholder={
+                loading
+                  ? "Loading..."
+                  : secondaryTranslationLanguage
+                    ? "Select version"
+                    : "Choose a language first"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Disabled</SelectItem>
+            {secondaryTranslations.map((translation) => (
+              <SelectItem key={translation.id} value={String(translation.id)}>
+                {translation.abbreviation} — {translation.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[0.625rem] text-muted-foreground">
+          Polish is enabled first with Gdańsk editions available from the bundled data source.
         </p>
       </div>
     </div>
@@ -743,7 +872,7 @@ function RemoteControlSection() {
       <div className="rounded-lg border border-border bg-muted/30 p-3">
         <p className="text-[0.625rem] font-medium text-muted-foreground mb-1">Firewall Note</p>
         <p className="text-[0.625rem] text-muted-foreground leading-relaxed">
-          Your OS may block incoming connections. On macOS, allow Rhema through
+          Your OS may block incoming connections. On macOS, allow Davar AI through
           System Settings → Network → Firewall. On Windows, allow through
           Windows Security → Firewall → Allow an app.
         </p>
@@ -803,7 +932,7 @@ function HelpSection() {
     <div className="space-y-6">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
-          Resources to help you get the most out of Rhema.
+          Resources to help you get the most out of Davar AI.
         </p>
       </div>
 

@@ -38,25 +38,18 @@ export const useDetectionStore = create<DetectionState>((set) => ({
     }),
   addDetections: (incoming) =>
     set((state) => {
-      const map = new Map<string, DetectionResult>()
-      // Incoming first — they take priority for recency/position
+      // Deduplicate incoming batch (keep highest confidence among duplicates)
+      const incomingMap = new Map<string, DetectionResult>()
       for (const d of incoming) {
-        const existing = map.get(d.verse_ref)
+        const existing = incomingMap.get(d.verse_ref)
         if (!existing || d.confidence > existing.confidence) {
-          map.set(d.verse_ref, d)
+          incomingMap.set(d.verse_ref, d)
         }
       }
-      // Existing detections — keep if no duplicate, or if higher confidence than incoming
-      for (const d of state.detections) {
-        const existing = map.get(d.verse_ref)
-        if (!existing || d.confidence > existing.confidence) {
-          map.set(d.verse_ref, d)
-        }
-      }
-      // Sort by confidence so high-confidence direct detections appear above semantic
-      return { detections: [...map.values()]
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 50) }
+      // Keep existing detections that are not superseded by incoming
+      const surviving = state.detections.filter((d) => !incomingMap.has(d.verse_ref))
+      // Latest results first, then older ones below
+      return { detections: [...incomingMap.values(), ...surviving].slice(0, 50) }
     }),
   setDetections: (detections) => set({ detections }),
   removeDetection: (verseRef) =>

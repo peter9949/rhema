@@ -2,10 +2,21 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import type { VerseRenderData } from "@/types"
 import type { Verse } from "@/types"
 
-export function toVerseRenderData(verse: Verse, translation: string): VerseRenderData {
+interface SecondaryVerseOption {
+  verse: Verse
+  translation: string
+}
+
+export function toVerseRenderData(
+  verse: Verse,
+  translation: string,
+  secondary?: SecondaryVerseOption,
+): VerseRenderData {
   return {
     reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation})`,
     segments: [{ verseNumber: verse.verse, text: verse.text }],
+    secondaryText: secondary?.verse.text,
+    secondaryTranslation: secondary?.translation,
   }
 }
 
@@ -13,13 +24,15 @@ export function deriveLiveVerse({
   isLive,
   selectedVerse,
   translation,
+  secondaryVerse,
 }: {
   isLive: boolean
   selectedVerse: Verse | null
   translation: string
+  secondaryVerse?: SecondaryVerseOption | null
 }): VerseRenderData | null {
   if (!isLive || !selectedVerse) return null
-  return toVerseRenderData(selectedVerse, translation)
+  return toVerseRenderData(selectedVerse, translation, secondaryVerse ?? undefined)
 }
 
 export const broadcastActions = {

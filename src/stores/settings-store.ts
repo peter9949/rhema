@@ -14,6 +14,8 @@ interface SettingsState {
   cooldownMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
+  secondaryTranslationLanguage: string | null
+  secondaryTranslationId: number | null
 
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
@@ -25,6 +27,8 @@ interface SettingsState {
   setCooldownMs: (ms: number) => void
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
+  setSecondaryTranslationLanguage: (language: string | null) => void
+  setSecondaryTranslationId: (id: number | null) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -38,6 +42,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   cooldownMs: 2500,
   onboardingComplete: false,
   sttProvider: "deepgram",
+  secondaryTranslationLanguage: "pl",
+  secondaryTranslationId: null,
 
   setDeepgramApiKey: (deepgramApiKey) => set({ deepgramApiKey }),
   setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
@@ -49,6 +55,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setCooldownMs: (cooldownMs) => set({ cooldownMs }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSttProvider: (sttProvider) => set({ sttProvider }),
+  setSecondaryTranslationLanguage: (secondaryTranslationLanguage) =>
+    set({ secondaryTranslationLanguage }),
+  setSecondaryTranslationId: (secondaryTranslationId) =>
+    set({ secondaryTranslationId }),
 }))
 
 const PERSISTED_KEYS = [
@@ -63,6 +73,8 @@ const PERSISTED_KEYS = [
   "cooldownMs",
   "onboardingComplete",
   "sttProvider",
+  "secondaryTranslationLanguage",
+  "secondaryTranslationId",
 ] as const satisfies readonly (keyof SettingsState)[]
 
 type PersistedKey = (typeof PERSISTED_KEYS)[number]

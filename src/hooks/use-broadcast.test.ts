@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Verse } from "@/types"
-import { deriveLiveVerse } from "./use-broadcast"
+import { deriveLiveVerse, toVerseRenderData } from "./use-broadcast"
 
 const sampleVerse: Verse = {
   id: 1,
@@ -34,6 +34,24 @@ describe("deriveLiveVerse", () => {
     expect(result).toEqual(
       expect.objectContaining({
         reference: "Genesis 1:2 (NKJV)",
+      }),
+    )
+  })
+
+  it("includes an optional secondary translation block", () => {
+    const result = toVerseRenderData(sampleVerse, "KJV", {
+      verse: {
+        ...sampleVerse,
+        translation_id: 11,
+        text: "A ziemia byla pustkowiem i chaosem.",
+      },
+      translation: "BG",
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        secondaryText: "A ziemia byla pustkowiem i chaosem.",
+        secondaryTranslation: "BG",
       }),
     )
   })

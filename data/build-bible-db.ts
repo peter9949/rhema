@@ -5,7 +5,7 @@
  */
 
 import { Database } from "bun:sqlite"
-import { readFileSync } from "node:fs"
+import { readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 const DATA_DIR = import.meta.dir
@@ -80,13 +80,15 @@ const TRANSLATIONS_META: Array<{
   { file: "SpaRV.json", abbreviation: "SpaRV", title: "Reina-Valera 1909", language: "es", license: "Public Domain" },
   { file: "FreJND.json", abbreviation: "FreJND", title: "J.N. Darby French 1885", language: "fr", license: "Public Domain" },
   { file: "PorBLivre.json", abbreviation: "PorBLivre", title: "Biblia Livre", language: "pt", license: "Public Domain" },
+  { file: "PolGdanska.json", abbreviation: "BG", title: "Biblia Gdanska (1881)", language: "pl", license: "Public Domain" },
+  { file: "PolUGdanska.json", abbreviation: "UBG", title: "Updated Gdansk Bible", language: "pl", license: "Public Domain" },
 ]
 
 function main() {
   console.log("\n🔨 Building rhema.db...\n")
 
   // Remove existing DB
-  try { require("node:fs").unlinkSync(DB_PATH) } catch {}
+  try { rmSync(DB_PATH, { force: true }) } catch {}
 
   const db = new Database(DB_PATH, { create: true })
 

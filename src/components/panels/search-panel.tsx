@@ -33,45 +33,6 @@ import { searchContextWithFuse } from "@/lib/context-search"
 
 type SearchTab = "book" | "context" 
 
-function parseCrossReference(reference: string): {
-  bookNumber: number
-  chapter: number
-  verseStart: number
-  verseEnd?: number
-} | null {
-  const [bookPart, chapterPart, versePart] = reference.split(":")
-  if (!bookPart || !chapterPart || !versePart) return null
-
-  const bookNumber = Number(bookPart)
-  const chapter = Number(chapterPart)
-  const [verseStartPart, verseEndPart] = versePart.split("-")
-  const verseStart = Number(verseStartPart)
-  const verseEnd = verseEndPart ? Number(verseEndPart) : undefined
-
-  if (
-    Number.isNaN(bookNumber)
-    || Number.isNaN(chapter)
-    || Number.isNaN(verseStart)
-    || (verseEndPart !== undefined && Number.isNaN(verseEnd))
-  ) {
-    return null
-  }
-
-  return { bookNumber, chapter, verseStart, verseEnd }
-}
-
-function formatCrossReference(reference: string, books: Book[]): string {
-  const parsed = parseCrossReference(reference)
-  if (!parsed) return reference
-
-  const bookName = books.find((book) => book.book_number === parsed.bookNumber)?.name
-    ?? `Book ${parsed.bookNumber}`
-  const verseSuffix = parsed.verseEnd && parsed.verseEnd !== parsed.verseStart
-    ? `${parsed.verseStart}-${parsed.verseEnd}`
-    : `${parsed.verseStart}`
-  return `${bookName} ${parsed.chapter}:${verseSuffix}`
-}
-
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
   if (!query || query.length < 2) return <>{text}</>
@@ -106,7 +67,6 @@ export function SearchPanel() {
   const [chapter, setChapter] = useState(1)
   const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null)
   const [contextQuery, setContextQuery] = useState("")
-  const [crossRefLoading, setCrossRefLoading] = useState(false)
 
   // EasyWorship-style autocomplete
   const [quickInput, setQuickInput] = useState("")
@@ -123,7 +83,6 @@ export function SearchPanel() {
     semanticResults,
     activeTranslationId,
     selectedVerse,
-    crossReferences,
   } = useBible()
 
   const queueItems = useQueueStore((s) => s.items)
@@ -172,39 +131,6 @@ export function SearchPanel() {
       }
     }
   }, [currentChapter, selectedVerseId, selectedVerse])
-
-  useEffect(() => {
-    if (!selectedVerse || selectedVerse.book_number <= 0) {
-      useBibleStore.getState().setCrossReferences([])
-      setCrossRefLoading(false)
-      return
-    }
-
-    let cancelled = false
-    setCrossRefLoading(true)
-
-    bibleActions
-      .loadCrossReferences(
-        selectedVerse.book_number,
-        selectedVerse.chapter,
-        selectedVerse.verse,
-      )
-      .catch((error) => {
-        if (!cancelled) {
-          console.error(error)
-          useBibleStore.getState().setCrossReferences([])
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCrossRefLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [selectedVerse])
 
   const applyNavigationSelection = useCallback(
     (book: Book, navChapter: number) => {
@@ -440,17 +366,6 @@ export function SearchPanel() {
     })
     setQuickInput("")
     setShowQuickVerses(false)
-  }, [])
-
-  const handleCrossReferenceClick = useCallback((reference: string) => {
-    const parsed = parseCrossReference(reference)
-    if (!parsed) return
-
-    bibleActions.navigateToVerse(
-      parsed.bookNumber,
-      parsed.chapter,
-      parsed.verseStart,
-    )
   }, [])
 
   return (
@@ -727,56 +642,7 @@ export function SearchPanel() {
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-border px-3 py-2">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Related verses
-                </p>
-                <p className="text-xs text-muted-foreground/80">
-                  {selectedVerse
-                    ? `${selectedVerse.book_name} ${selectedVerse.chapter}:${selectedVerse.verse}`
-                    : "Select a verse to load cross-references"}
-                </p>
-              </div>
-              {selectedVerse && crossReferences.length > 0 && (
-                <span className="text-[0.625rem] text-muted-foreground">
-                  {crossReferences.length} found
-                </span>
-              )}
-            </div>
 
-            <div className="max-h-40 overflow-y-auto pr-1">
-              {crossRefLoading ? (
-                <p className="py-2 text-xs text-muted-foreground">Loading related verses...</p>
-              ) : !selectedVerse ? (
-                <p className="py-2 text-xs text-muted-foreground">
-                  Choose a verse in the chapter list to see related references.
-                </p>
-              ) : crossReferences.length === 0 ? (
-                <p className="py-2 text-xs text-muted-foreground">
-                  No cross-references found for this verse.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {crossReferences.slice(0, 12).map((reference) => (
-                    <button
-                      key={`${reference.from_ref}-${reference.to_ref}`}
-                      onClick={() => handleCrossReferenceClick(reference.to_ref)}
-                      className="flex items-center justify-between rounded-md border border-transparent px-2 py-1.5 text-left transition-colors hover:border-lime-500/30 hover:bg-lime-500/10"
-                    >
-                      <span className="text-xs text-foreground">
-                        {formatCrossReference(reference.to_ref, books)}
-                      </span>
-                      <span className="text-[0.625rem] text-muted-foreground">
-                        {reference.votes} votes
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </>
       )}
 

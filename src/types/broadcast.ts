@@ -6,6 +6,8 @@ export interface VerseSegment {
 export interface VerseRenderData {
   reference: string
   segments: VerseSegment[]
+  secondaryText?: string
+  secondaryTranslation?: string
 }
 
 export interface RenderOptions {

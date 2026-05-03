@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { deriveLiveVerse } from "@/hooks/use-broadcast"
+import { useDisplayVerseData } from "@/hooks/use-display-verse"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -15,6 +16,7 @@ export function LiveOutputPanel() {
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
   const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+  const displayVerseData = useDisplayVerseData(selectedVerse)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
   const translation =
@@ -24,6 +26,15 @@ export function LiveOutputPanel() {
     isLive,
     selectedVerse,
     translation,
+    secondaryVerse: displayVerseData?.secondaryText
+      ? {
+          verse: {
+            ...selectedVerse!,
+            text: displayVerseData.secondaryText,
+          },
+          translation: displayVerseData.secondaryTranslation ?? "",
+        }
+      : null,
   })
 
   useEffect(() => {

@@ -3,12 +3,12 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { useBibleStore, useBroadcastStore } from "@/stores"
 import { bibleActions } from "@/hooks/use-bible"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { useDisplayVerseData } from "@/hooks/use-display-verse"
 
 export function PreviewPanel() {
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
-  const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+  const verseData = useDisplayVerseData(selectedVerse)
 
   // When translation changes, re-fetch the selected verse in the new translation
   useEffect(() => {
@@ -26,9 +26,6 @@ export function PreviewPanel() {
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
-  const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
-
-  const verseData = selectedVerse ? toVerseRenderData(selectedVerse, translation) : null
 
   return (
     <div

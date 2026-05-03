@@ -18,6 +18,8 @@ const TRANSLATIONS = [
   { file: "SpaRV.json", name: "Reina-Valera 1909" },
   { file: "FreJND.json", name: "J.N. Darby French" },
   { file: "PorBLivre.json", name: "Biblia Livre" },
+  { file: "PolGdanska.json", name: "Polish Biblia Gdanska (1881)" },
+  { file: "PolUGdanska.json", name: "Updated Gdansk Bible" },
 ]
 
 const CROSS_REFS_URL = "https://a.openbible.info/data/cross-references.zip"

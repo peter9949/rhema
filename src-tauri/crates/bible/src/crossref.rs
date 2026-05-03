@@ -14,14 +14,19 @@ impl BibleDb {
         verse: i32,
     ) -> Result<Vec<CrossReference>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let from_ref = format!("{book_number}:{chapter}:{verse}");
         let mut stmt = conn.prepare(
-            "SELECT from_ref, to_ref, votes \
+            "SELECT \
+                printf('%d:%d:%d', from_book, from_chapter, from_verse) AS from_ref, \
+                CASE \
+                    WHEN to_verse_start = to_verse_end THEN printf('%d:%d:%d', to_book, to_chapter, to_verse_start) \
+                    ELSE printf('%d:%d:%d-%d', to_book, to_chapter, to_verse_start, to_verse_end) \
+                END AS to_ref, \
+                votes \
              FROM cross_references \
-             WHERE from_ref = ?1 \
+             WHERE from_book = ?1 AND from_chapter = ?2 AND from_verse = ?3 \
              ORDER BY votes DESC",
         )?;
-        let rows = stmt.query_map(rusqlite::params![from_ref], |row: &rusqlite::Row| {
+        let rows = stmt.query_map(rusqlite::params![book_number, chapter, verse], |row: &rusqlite::Row| {
             Ok(CrossReference {
                 from_ref: row.get(0)?,
                 to_ref: row.get(1)?,

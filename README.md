@@ -145,7 +145,6 @@ No setup required! Whisper runs locally on your machine with no API costs or int
 
 **Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
-
 ```
 DEEPGRAM_API_KEY=your_key_here
 ```

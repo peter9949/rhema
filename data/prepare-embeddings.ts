@@ -19,6 +19,7 @@
 
 import { join } from "node:path"
 import { existsSync } from "node:fs"
+import { Database } from "bun:sqlite"
 import {
   ensurePythonEnv,
   getVenvBin,
@@ -35,6 +36,7 @@ const MODELS_DIR_INT8 = join(
 )
 
 const KJV_SOURCE = join(DATA_DIR, "sources", "KJV.json")
+const CROSS_REFS_TXT = join(DATA_DIR, "cross-refs", "cross_references.txt")
 const NIV_SOURCE = join(DATA_DIR, "sources", "NIV.json")
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
@@ -54,6 +56,23 @@ function shouldSkip(label: string, ...artifacts: string[]): boolean {
     console.log(`  ⏭ Skip: ${label} (artifacts already exist)`)
   }
   return allExist
+}
+
+function dbHasCrossReferences(dbPath: string): boolean {
+  if (!existsSync(dbPath)) {
+    return false
+  }
+
+  try {
+    const db = new Database(dbPath, { readonly: true })
+    const result = db
+      .query("SELECT COUNT(*) as c FROM cross_references")
+      .get() as { c: number } | null
+    db.close()
+    return (result?.c ?? 0) > 0
+  } catch {
+    return false
+  }
 }
 
 async function run(
@@ -94,7 +113,7 @@ async function main() {
 
   // ── Phase 2: Open-source Bible data ────────────────────────────
   console.log("\n━━━ Phase 2/8: Download open-source Bible data ━━━")
-  if (!shouldSkip("open-source Bible data", KJV_SOURCE)) {
+  if (!shouldSkip("open-source Bible data", KJV_SOURCE, CROSS_REFS_TXT)) {
     await run(["bun", "run", join(DATA_DIR, "download-sources.ts")])
   }
 
@@ -113,7 +132,11 @@ async function main() {
 
   // ── Phase 4: Build Bible database ──────────────────────────────
   console.log("\n━━━ Phase 4/8: Build Bible database ━━━")
-  if (!shouldSkip("Bible database", DB_PATH)) {
+  const canSkipDb = shouldSkip("Bible database", DB_PATH) && dbHasCrossReferences(DB_PATH)
+  if (!canSkipDb) {
+    if (existsSync(DB_PATH) && !dbHasCrossReferences(DB_PATH) && !force) {
+      console.log("  ↻ Rebuilding Bible database to import missing cross-references")
+    }
     await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
   }
 

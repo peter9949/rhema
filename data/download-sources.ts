@@ -3,7 +3,7 @@
  * Run: bun run data/download-sources.ts
  */
 
-import { mkdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 const DATA_DIR = import.meta.dir
@@ -32,6 +32,39 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   console.log(`  ✓ Saved ${dest} (${sizeMB} MB)`)
 }
 
+async function extractZip(zipDest: string, outDir: string): Promise<void> {
+  if (process.platform === "win32") {
+    const proc = Bun.spawn(
+      [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        `Expand-Archive -Path '${zipDest}' -DestinationPath '${outDir}' -Force`,
+      ],
+      {
+        stdout: "inherit",
+        stderr: "inherit",
+      },
+    )
+    const code = await proc.exited
+    if (code !== 0) {
+      throw new Error(`Failed to extract zip via PowerShell (exit ${code})`)
+    }
+    return
+  }
+
+  const proc = Bun.spawn(["unzip", "-o", zipDest, "-d", outDir], {
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  const code = await proc.exited
+  if (code !== 0) {
+    throw new Error(`Failed to extract zip via unzip (exit ${code})`)
+  }
+}
+
 async function main() {
   await mkdir(SOURCES_DIR, { recursive: true })
   await mkdir(CROSS_REFS_DIR, { recursive: true })
@@ -56,15 +89,14 @@ async function main() {
     console.log(`  ⏭ cross_references.txt already exists, skipping`)
   } else {
     const zipDest = join(CROSS_REFS_DIR, "cross-references.zip")
-    await downloadFile(CROSS_REFS_URL, zipDest)
-    // Unzip
-    const proc = Bun.spawn(["unzip", "-o", zipDest, "-d", CROSS_REFS_DIR], {
-      stdout: "inherit",
-      stderr: "inherit",
-    })
-    await proc.exited
-    // Clean up zip
-    await Bun.write(zipDest, "") // truncate
+    const existingZip = Bun.file(zipDest)
+    if (!(await existingZip.exists()) || existingZip.size < 1000) {
+      await downloadFile(CROSS_REFS_URL, zipDest)
+    } else {
+      console.log(`  ⏭ cross-references.zip already exists, extracting`)
+    }
+    await extractZip(zipDest, CROSS_REFS_DIR)
+    await rm(zipDest, { force: true })
   }
 
   console.log("\n✅ All source data downloaded!\n")

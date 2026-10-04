@@ -33,6 +33,7 @@ import {
 import {
   MicIcon,
   TvIcon,
+  TypeIcon,
   KeyIcon,
   SettingsIcon,
   CheckIcon,
@@ -42,7 +43,7 @@ import {
   GraduationCapIcon,
   BrainCircuitIcon,
 } from "lucide-react"
-import { useSettingsStore } from "@/stores"
+import { useBroadcastStore, useSettingsStore } from "@/stores"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
@@ -51,7 +52,16 @@ import type { DeviceInfo } from "@/types/audio"
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection = "audio" | "speech" | "bible" | "display" | "api-keys" | "remote" | "help"
+type NavSection = "audio" | "speech" | "bible" | "typography" | "display" | "api-keys" | "remote" | "help"
+
+const TYPOGRAPHY_FONT_FAMILIES = [
+  "Geist Variable",
+  "Source Serif 4 Variable",
+  "Georgia",
+  "Arial",
+  "Helvetica",
+  "Times New Roman",
+] as const
 
 const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
   {
@@ -68,6 +78,11 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
     name: "Bible",
     id: "bible",
     icon: <BookOpenIcon strokeWidth={2} />,
+  },
+  {
+    name: "Typography",
+    id: "typography",
+    icon: <TypeIcon strokeWidth={2} />,
   },
   {
     name: "Display Mode",
@@ -435,6 +450,7 @@ const sectionTitles: Record<NavSection, string> = {
   audio: "Audio",
   speech: "Speech Recognition",
   bible: "Bible Translation",
+  typography: "Typography",
   display: "Display Mode",
   remote: "Remote Control",
   "api-keys": "API Keys",
@@ -670,6 +686,182 @@ function BibleSection() {
   )
 }
 
+function TypographySection() {
+  const themes = useBroadcastStore((s) => s.themes)
+  const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const typographyVerseFontFamily = useSettingsStore((s) => s.typographyVerseFontFamily)
+  const typographyVerseFontSize = useSettingsStore((s) => s.typographyVerseFontSize)
+  const typographyVerseFontWeight = useSettingsStore((s) => s.typographyVerseFontWeight)
+  const typographyVerseLineHeight = useSettingsStore((s) => s.typographyVerseLineHeight)
+  const typographyReferenceFontSize = useSettingsStore((s) => s.typographyReferenceFontSize)
+  const typographyReferenceFontWeight = useSettingsStore((s) => s.typographyReferenceFontWeight)
+  const setTypographyVerseFontFamily = useSettingsStore((s) => s.setTypographyVerseFontFamily)
+  const setTypographyVerseFontSize = useSettingsStore((s) => s.setTypographyVerseFontSize)
+  const setTypographyVerseFontWeight = useSettingsStore((s) => s.setTypographyVerseFontWeight)
+  const setTypographyVerseLineHeight = useSettingsStore((s) => s.setTypographyVerseLineHeight)
+  const setTypographyReferenceFontSize = useSettingsStore((s) => s.setTypographyReferenceFontSize)
+  const setTypographyReferenceFontWeight = useSettingsStore((s) => s.setTypographyReferenceFontWeight)
+
+  const activeTheme = themes.find((theme) => theme.id === activeThemeId) ?? themes[0]
+  if (!activeTheme) return null
+
+  const verseFontSize = typographyVerseFontSize ?? activeTheme.verseText.fontSize
+  const verseFontWeight = typographyVerseFontWeight ?? activeTheme.verseText.fontWeight
+  const verseLineHeight = typographyVerseLineHeight ?? activeTheme.verseText.lineHeight
+  const referenceFontSize = typographyReferenceFontSize ?? activeTheme.reference.fontSize
+  const referenceFontWeight = typographyReferenceFontWeight ?? activeTheme.reference.fontWeight
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-foreground">Global verse typography</p>
+          <p className="text-[0.625rem] text-muted-foreground">
+            Overrides the active theme for preview, live output, and broadcast output.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[0.625rem]"
+          onClick={() => {
+            setTypographyVerseFontFamily(null)
+            setTypographyVerseFontSize(null)
+            setTypographyVerseFontWeight(null)
+            setTypographyVerseLineHeight(null)
+            setTypographyReferenceFontSize(null)
+            setTypographyReferenceFontWeight(null)
+          }}
+        >
+          Reset
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Verse Font Family
+        </label>
+        <Select
+          value={typographyVerseFontFamily ?? "__theme__"}
+          onValueChange={(value) => setTypographyVerseFontFamily(value === "__theme__" ? null : value)}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__theme__">Use active theme ({activeTheme.verseText.fontFamily})</SelectItem>
+            {TYPOGRAPHY_FONT_FAMILIES.map((fontFamily) => (
+              <SelectItem key={fontFamily} value={fontFamily}>
+                {fontFamily}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[0.625rem] text-muted-foreground">
+          Secondary translation text follows the same font styling and scales under the main verse.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Verse Font Size
+          </label>
+          <span className="text-xs tabular-nums text-muted-foreground">{verseFontSize}px</span>
+        </div>
+        <Slider
+          min={20}
+          max={140}
+          step={1}
+          value={[verseFontSize]}
+          onValueChange={([value]) => setTypographyVerseFontSize(value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Verse Font Weight
+        </label>
+        <Select
+          value={String(verseFontWeight)}
+          onValueChange={(value) => setTypographyVerseFontWeight(Number(value))}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[300, 400, 500, 600, 700, 800, 900].map((weight) => (
+              <SelectItem key={weight} value={String(weight)}>
+                {weight}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Verse Line Height
+          </label>
+          <span className="text-xs tabular-nums text-muted-foreground">{verseLineHeight.toFixed(2)}</span>
+        </div>
+        <Slider
+          min={0.8}
+          max={2}
+          step={0.05}
+          value={[verseLineHeight]}
+          onValueChange={([value]) => setTypographyVerseLineHeight(value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-0.5 border-t pt-3">
+        <h4 className="text-xs font-semibold">Reference Label</h4>
+        <p className="text-[0.625rem] text-muted-foreground">
+          Adjusts the verse reference line rendered above or below the scripture text.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Reference Font Size
+          </label>
+          <span className="text-xs tabular-nums text-muted-foreground">{referenceFontSize}px</span>
+        </div>
+        <Slider
+          min={14}
+          max={72}
+          step={1}
+          value={[referenceFontSize]}
+          onValueChange={([value]) => setTypographyReferenceFontSize(value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Reference Font Weight
+        </label>
+        <Select
+          value={String(referenceFontWeight)}
+          onValueChange={(value) => setTypographyReferenceFontWeight(Number(value))}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[300, 400, 500, 600, 700, 800, 900].map((weight) => (
+              <SelectItem key={weight} value={String(weight)}>
+                {weight}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  )
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Section: Remote Control                                                   */
 /* -------------------------------------------------------------------------- */
@@ -687,8 +879,8 @@ interface CommandLogEntry {
 }
 
 function RemoteControlSection() {
-  const [oscEnabled, setOscEnabled] = useState(false)
-  const [httpEnabled, setHttpEnabled] = useState(false)
+  const [, setOscEnabled] = useState(false)
+  const [, setHttpEnabled] = useState(false)
   const [oscPort, setOscPort] = useState("8000")
   const [httpPort, setHttpPort] = useState("8080")
   const [oscStatus, setOscStatus] = useState<RemoteStatus>({ running: false, port: null })
@@ -1001,6 +1193,7 @@ const sectionComponents: Record<NavSection, React.FC> = {
   audio: AudioSection,
   speech: SpeechSection,
   bible: BibleSection,
+  typography: TypographySection,
   display: DisplayModeSection,
   remote: RemoteControlSection,
   "api-keys": ApiKeysSection,

@@ -18,7 +18,8 @@ fn window_label(output_id: &str) -> &'static str {
 
 /// Map `output_id` to broadcast-output.html URL with query param.
 fn window_url(output_id: &str) -> String {
-    format!("broadcast-output.html?output={output_id}")
+    // Use an absolute app path so secondary windows resolve correctly in both dev and build.
+    format!("/broadcast-output.html?output={output_id}")
 }
 
 #[derive(Serialize)]

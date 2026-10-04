@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { availableMonitors, getAllWindows, type Monitor } from '@tauri-apps/api/window'
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -261,8 +262,10 @@ export function BroadcastSettings({
           syncNdiConfigToOutput("main", true, ndiFrameRate, ndiResolution)
         }, 300)
       }
-    } catch {
-      // Command may not exist yet
+    } catch (error) {
+      console.error("Failed to toggle main NDI", error)
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`NDI failed to start/stop: ${message}`)
     }
   }
 
@@ -352,7 +355,9 @@ export function BroadcastSettings({
         }, 300)
       }
     } catch (error) {
-      console.warn("Failed to toggle alt NDI", error)
+      console.error("Failed to toggle alt NDI", error)
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`Alt NDI failed to start/stop: ${message}`)
     }
   }
 

@@ -6,11 +6,19 @@ import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { deriveLiveVerse } from "@/hooks/use-broadcast"
 import { useDisplayVerseData } from "@/hooks/use-display-verse"
+import { useSettingsStore } from "@/stores/settings-store"
+import { applyTypographyOverrides } from "@/lib/typography-overrides"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const typographyVerseFontFamily = useSettingsStore((s) => s.typographyVerseFontFamily)
+  const typographyVerseFontSize = useSettingsStore((s) => s.typographyVerseFontSize)
+  const typographyVerseFontWeight = useSettingsStore((s) => s.typographyVerseFontWeight)
+  const typographyVerseLineHeight = useSettingsStore((s) => s.typographyVerseLineHeight)
+  const typographyReferenceFontSize = useSettingsStore((s) => s.typographyReferenceFontSize)
+  const typographyReferenceFontWeight = useSettingsStore((s) => s.typographyReferenceFontWeight)
 
   // Read the same data source as the preview panel
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
@@ -19,6 +27,16 @@ export function LiveOutputPanel() {
   const displayVerseData = useDisplayVerseData(selectedVerse)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  const effectiveTheme = activeTheme
+    ? applyTypographyOverrides(activeTheme, {
+        verseFontFamily: typographyVerseFontFamily,
+        verseFontSize: typographyVerseFontSize,
+        verseFontWeight: typographyVerseFontWeight,
+        verseLineHeight: typographyVerseLineHeight,
+        referenceFontSize: typographyReferenceFontSize,
+        referenceFontWeight: typographyReferenceFontWeight,
+      })
+    : activeTheme
   const translation =
     translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
 
@@ -75,7 +93,7 @@ export function LiveOutputPanel() {
           !isLive && "opacity-40"
         )}
       >
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        <CanvasVerse theme={effectiveTheme} verse={verseData} />
       </div>
     </div>
   )

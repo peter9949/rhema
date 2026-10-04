@@ -66,88 +66,118 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
 
-            // Try resource dir first (production), then dev fallback
-            let db_path = app
-                .path()
-                .resource_dir()
-                .map(|p| p.join("rhema.db"))
-                .ok()
-                .filter(|p| p.exists())
-                .unwrap_or_else(|| {
-                    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("../data/rhema.db")
-                });
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Try resource dir first (production), then dev fallback
+                let db_path = app_handle
+                    .path()
+                    .resource_dir()
+                    .map(|p| p.join("rhema.db"))
+                    .ok()
+                    .filter(|p| p.exists())
+                    .unwrap_or_else(|| {
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join("../data/rhema.db")
+                    });
 
-            if db_path.exists() {
-                let bible_db = rhema_bible::BibleDb::open(&db_path)
-                    .expect("Failed to open Bible database");
-
-                let managed_state = app.state::<Mutex<state::AppState>>();
-                let mut state = managed_state.lock().unwrap();
-                state.bible_db = Some(bible_db);
-                drop(state);
-                log::info!("Bible database loaded from {}", db_path.display());
-            } else {
-                log::warn!("Bible database not found at {}", db_path.display());
-            }
-
-            // Try to load ONNX embedding model and pre-computed verse index
-            // Prefer INT8 quantized model (~571MB) over FP32 (~2.4GB)
-            let base_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-            let model_path = {
-                let int8 = base_dir.join("models/qwen3-embedding-0.6b-int8/model_quantized.onnx");
-                let fp32 = base_dir.join("models/qwen3-embedding-0.6b/model.onnx");
-                if int8.exists() {
-                    log::info!("Using INT8 quantized ONNX model");
-                    int8
-                } else if fp32.exists() {
-                    log::info!("Using FP32 ONNX model (INT8 not found)");
-                    fp32
-                } else {
-                    fp32
-                }
-            };
-            let tokenizer_path = base_dir.join("models/qwen3-embedding-0.6b/tokenizer.json");
-            let embeddings_path = base_dir.join("embeddings/kjv-qwen3-0.6b.bin");
-            let ids_path = base_dir.join("embeddings/kjv-qwen3-0.6b-ids.bin");
-
-            if model_path.exists() && tokenizer_path.exists() {
-                use rhema_detection::semantic::embedder::TextEmbedder;
-                use rhema_detection::semantic::index::VectorIndex;
-                match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
-                    Ok(embedder) => {
-                        log::info!("ONNX embedding model loaded");
-                        let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
-                        let mut pipeline = managed_pipeline.lock().unwrap();
-
-                        // If pre-computed embeddings exist, load the vector index
-                        if embeddings_path.exists() && ids_path.exists() {
-                            let dim = embedder.dimension();
-                            match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
-                                Ok(index) => {
-                                    log::info!("Verse embeddings loaded ({} vectors)", index.len());
-                                    pipeline.set_semantic(
-                                        rhema_detection::SemanticDetector::new(
-                                            Box::new(embedder),
-                                            Box::new(index),
-                                        ),
-                                    );
-                                }
-                                Err(e) => {
-                                    log::warn!("Failed to load verse embeddings: {e}");
-                                }
-                            }
-                        } else {
-                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                if db_path.exists() {
+                    match rhema_bible::BibleDb::open(&db_path) {
+                        Ok(bible_db) => {
+                            let managed_state = app_handle.state::<Mutex<state::AppState>>();
+                            let mut state = managed_state.lock().unwrap();
+                            state.bible_db = Some(bible_db);
+                            drop(state);
+                            log::info!("Bible database loaded from {}", db_path.display());
+                        }
+                        Err(err) => {
+                            log::warn!("Failed to open Bible database at {}: {err}", db_path.display());
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Failed to load ONNX model: {e}");
-                    }
+                } else {
+                    log::warn!("Bible database not found at {}", db_path.display());
                 }
-            } else {
-                log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
-            }
+
+                // Try to load ONNX embedding model and pre-computed verse index.
+                // On Windows, some ONNX Runtime builds are unstable with this INT8 model,
+                // so default to FP32 unless explicitly opted into INT8.
+                let base_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+                let model_path = {
+                    let int8 = base_dir.join("models/qwen3-embedding-0.6b-int8/model_quantized.onnx");
+                    let fp32 = base_dir.join("models/qwen3-embedding-0.6b/model.onnx");
+                    let prefer_int8 = std::env::var("RHEMA_PREFER_INT8")
+                        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                        .unwrap_or(false);
+
+                    #[cfg(target_os = "windows")]
+                    {
+                        if prefer_int8 && int8.exists() {
+                            log::info!("Using INT8 quantized ONNX model (RHEMA_PREFER_INT8 enabled)");
+                            int8
+                        } else if fp32.exists() {
+                            log::info!("Using FP32 ONNX model on Windows (set RHEMA_PREFER_INT8=1 to force INT8)");
+                            fp32
+                        } else if int8.exists() {
+                            log::info!("Using INT8 quantized ONNX model (FP32 not found)");
+                            int8
+                        } else {
+                            fp32
+                        }
+                    }
+
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        if int8.exists() {
+                            log::info!("Using INT8 quantized ONNX model");
+                            int8
+                        } else if fp32.exists() {
+                            log::info!("Using FP32 ONNX model (INT8 not found)");
+                            fp32
+                        } else {
+                            fp32
+                        }
+                    }
+                };
+                let tokenizer_path = base_dir.join("models/qwen3-embedding-0.6b/tokenizer.json");
+                let embeddings_path = base_dir.join("embeddings/kjv-qwen3-0.6b.bin");
+                let ids_path = base_dir.join("embeddings/kjv-qwen3-0.6b-ids.bin");
+
+                if model_path.exists() && tokenizer_path.exists() {
+                    use rhema_detection::semantic::embedder::TextEmbedder;
+                    use rhema_detection::semantic::index::VectorIndex;
+                    match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
+                        Ok(embedder) => {
+                            log::info!("ONNX embedding model loaded");
+                            let managed_pipeline = app_handle.state::<Mutex<rhema_detection::DetectionPipeline>>();
+                            let mut pipeline = managed_pipeline.lock().unwrap();
+
+                            if embeddings_path.exists() && ids_path.exists() {
+                                let dim = embedder.dimension();
+                                match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
+                                    Ok(index) => {
+                                        log::info!("Verse embeddings loaded ({} vectors)", index.len());
+                                        pipeline.set_semantic(
+                                            rhema_detection::SemanticDetector::new(
+                                                Box::new(embedder),
+                                                Box::new(index),
+                                            ),
+                                        );
+                                    }
+                                    Err(e) => {
+                                        log::warn!("Failed to load verse embeddings: {e}");
+                                    }
+                                }
+                            } else {
+                                log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to load ONNX model: {e}");
+                        }
+                    }
+                } else {
+                    log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
+                }
+            });
 
             Ok(())
         })

@@ -243,5 +243,19 @@ function BroadcastCanvas() {
   )
 }
 
-const root = document.getElementById("broadcast-root")!
-createRoot(root).render(<BroadcastCanvas />)
+function resolveMountRoot(): HTMLElement {
+  const existing = document.getElementById("broadcast-root")
+  if (existing) return existing
+
+  // Fallback for misrouted or customized HTML entry files.
+  const fallback = document.createElement("div")
+  fallback.id = "broadcast-root"
+  document.body.appendChild(fallback)
+  return fallback
+}
+
+document.body.style.margin = "0"
+document.body.style.background = "#000"
+document.body.style.overflow = "hidden"
+
+createRoot(resolveMountRoot()).render(<BroadcastCanvas />)

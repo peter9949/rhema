@@ -3,6 +3,8 @@ import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { applyTypographyOverrides } from "@/lib/typography-overrides"
+import { useSettingsStore } from "@/stores/settings-store"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -76,16 +78,25 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
 
 function emitDraftToBroadcast(state: BroadcastState): void {
   if (!state.draftTheme) return
+  const settings = useSettingsStore.getState()
+  const effectiveTheme = applyTypographyOverrides(state.draftTheme, {
+    verseFontFamily: settings.typographyVerseFontFamily,
+    verseFontSize: settings.typographyVerseFontSize,
+    verseFontWeight: settings.typographyVerseFontWeight,
+    verseLineHeight: settings.typographyVerseLineHeight,
+    referenceFontSize: settings.typographyReferenceFontSize,
+    referenceFontWeight: settings.typographyReferenceFontWeight,
+  })
   const id = state.editingThemeId
   if (id === state.activeThemeId) {
     void emitTo("broadcast", "broadcast:verse-update", {
-      theme: state.draftTheme,
+      theme: effectiveTheme,
       verse: state.liveVerse,
     }).catch(() => {})
   }
   if (id === state.altActiveThemeId) {
     void emitTo("broadcast-alt", "broadcast:verse-update", {
-      theme: state.draftTheme,
+      theme: effectiveTheme,
       verse: state.liveVerse,
     }).catch(() => {})
   }
@@ -168,9 +179,18 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const label = outputId === "alt" ? "broadcast-alt" : "broadcast"
     const theme = s.themes.find((t) => t.id === themeId) ?? s.themes[0]
     if (!theme) return
+    const settings = useSettingsStore.getState()
+    const effectiveTheme = applyTypographyOverrides(theme, {
+      verseFontFamily: settings.typographyVerseFontFamily,
+      verseFontSize: settings.typographyVerseFontSize,
+      verseFontWeight: settings.typographyVerseFontWeight,
+      verseLineHeight: settings.typographyVerseLineHeight,
+      referenceFontSize: settings.typographyReferenceFontSize,
+      referenceFontWeight: settings.typographyReferenceFontWeight,
+    })
 
     void emitTo(label, "broadcast:verse-update", {
-      theme,
+      theme: effectiveTheme,
       verse: s.liveVerse,
     }).catch(() => {})
   },
@@ -254,6 +274,20 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   setSelectedElement: (selectedElement) => set({ selectedElement }),
 }))
+
+useSettingsStore.subscribe((state, prevState) => {
+  const typographyChanged =
+    state.typographyVerseFontFamily !== prevState.typographyVerseFontFamily
+    || state.typographyVerseFontSize !== prevState.typographyVerseFontSize
+    || state.typographyVerseFontWeight !== prevState.typographyVerseFontWeight
+    || state.typographyVerseLineHeight !== prevState.typographyVerseLineHeight
+    || state.typographyReferenceFontSize !== prevState.typographyReferenceFontSize
+    || state.typographyReferenceFontWeight !== prevState.typographyReferenceFontWeight
+
+  if (typographyChanged) {
+    useBroadcastStore.getState().syncBroadcastOutput()
+  }
+})
 
 // ── Theme persistence via tauri-plugin-store ──
 

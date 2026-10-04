@@ -4,6 +4,8 @@ import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { useBibleStore, useBroadcastStore } from "@/stores"
 import { bibleActions } from "@/hooks/use-bible"
 import { useDisplayVerseData } from "@/hooks/use-display-verse"
+import { useSettingsStore } from "@/stores/settings-store"
+import { applyTypographyOverrides } from "@/lib/typography-overrides"
 
 export function PreviewPanel() {
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
@@ -24,8 +26,24 @@ export function PreviewPanel() {
   }, [activeTranslationId])
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const typographyVerseFontFamily = useSettingsStore((s) => s.typographyVerseFontFamily)
+  const typographyVerseFontSize = useSettingsStore((s) => s.typographyVerseFontSize)
+  const typographyVerseFontWeight = useSettingsStore((s) => s.typographyVerseFontWeight)
+  const typographyVerseLineHeight = useSettingsStore((s) => s.typographyVerseLineHeight)
+  const typographyReferenceFontSize = useSettingsStore((s) => s.typographyReferenceFontSize)
+  const typographyReferenceFontWeight = useSettingsStore((s) => s.typographyReferenceFontWeight)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  const effectiveTheme = activeTheme
+    ? applyTypographyOverrides(activeTheme, {
+        verseFontFamily: typographyVerseFontFamily,
+        verseFontSize: typographyVerseFontSize,
+        verseFontWeight: typographyVerseFontWeight,
+        verseLineHeight: typographyVerseLineHeight,
+        referenceFontSize: typographyReferenceFontSize,
+        referenceFontWeight: typographyReferenceFontWeight,
+      })
+    : activeTheme
 
   return (
     <div
@@ -34,7 +52,7 @@ export function PreviewPanel() {
     >
       <PanelHeader title="Program preview" />
       <div className="flex min-h-0 flex-1 items-center justify-center p-3">
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        <CanvasVerse theme={effectiveTheme} verse={verseData} />
       </div>
     </div>
   )

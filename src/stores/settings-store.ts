@@ -4,6 +4,14 @@ import { load, type Store } from "@tauri-apps/plugin-store"
 type SttProvider = "deepgram" | "whisper"
 
 interface SettingsState {
+  // Typography overrides (null = use active theme's value)
+  typographyVerseFontFamily: string | null
+  typographyVerseFontSize: number | null
+  typographyVerseFontWeight: number | null
+  typographyVerseLineHeight: number | null
+  typographyReferenceFontSize: number | null
+  typographyReferenceFontWeight: number | null
+
   deepgramApiKey: string | null
   openaiApiKey: string | null
   claudeApiKey: string | null
@@ -29,9 +37,22 @@ interface SettingsState {
   setSttProvider: (provider: SttProvider) => void
   setSecondaryTranslationLanguage: (language: string | null) => void
   setSecondaryTranslationId: (id: number | null) => void
+  setTypographyVerseFontFamily: (v: string | null) => void
+  setTypographyVerseFontSize: (v: number | null) => void
+  setTypographyVerseFontWeight: (v: number | null) => void
+  setTypographyVerseLineHeight: (v: number | null) => void
+  setTypographyReferenceFontSize: (v: number | null) => void
+  setTypographyReferenceFontWeight: (v: number | null) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
+    typographyVerseFontFamily: null,
+    typographyVerseFontSize: null,
+    typographyVerseFontWeight: null,
+    typographyVerseLineHeight: null,
+    typographyReferenceFontSize: null,
+    typographyReferenceFontWeight: null,
+
   deepgramApiKey: null,
   openaiApiKey: null,
   claudeApiKey: null,
@@ -59,13 +80,18 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     set({ secondaryTranslationLanguage }),
   setSecondaryTranslationId: (secondaryTranslationId) =>
     set({ secondaryTranslationId }),
+  setTypographyVerseFontFamily: (typographyVerseFontFamily) => set({ typographyVerseFontFamily }),
+  setTypographyVerseFontSize: (typographyVerseFontSize) => set({ typographyVerseFontSize }),
+  setTypographyVerseFontWeight: (typographyVerseFontWeight) => set({ typographyVerseFontWeight }),
+  setTypographyVerseLineHeight: (typographyVerseLineHeight) => set({ typographyVerseLineHeight }),
+  setTypographyReferenceFontSize: (typographyReferenceFontSize) => set({ typographyReferenceFontSize }),
+  setTypographyReferenceFontWeight: (typographyReferenceFontWeight) => set({ typographyReferenceFontWeight }),
 }))
 
 const PERSISTED_KEYS = [
   "deepgramApiKey",
   "openaiApiKey",
   "claudeApiKey",
-  "activeTranslationId",
   "audioDeviceId",
   "gain",
   "autoMode",
@@ -75,9 +101,13 @@ const PERSISTED_KEYS = [
   "sttProvider",
   "secondaryTranslationLanguage",
   "secondaryTranslationId",
+  "typographyVerseFontFamily",
+  "typographyVerseFontSize",
+  "typographyVerseFontWeight",
+  "typographyVerseLineHeight",
+  "typographyReferenceFontSize",
+  "typographyReferenceFontWeight",
 ] as const satisfies readonly (keyof SettingsState)[]
-
-type PersistedKey = (typeof PERSISTED_KEYS)[number]
 
 let tauriStore: Store | null = null
 let hydrationPromise: Promise<void> | null = null
